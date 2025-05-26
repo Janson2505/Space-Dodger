@@ -86,7 +86,7 @@ let rocket = {
     y: GAME_HEIGHT - ROCKET_HEIGHT - 30,
     vx: 0,
     vy: 0,
-    speed: 5,
+    speed: 8,
     alive: true,
 };
 let asteroids = [];
@@ -173,9 +173,9 @@ function drawStars() {
     });
     ctx.restore();
 }
-function updateStars() {
+function updateStars(delta) {
     stars.forEach(star => {
-        star.y += star.speed;
+        star.y += star.speed * delta * 60;
         if (star.y > GAME_HEIGHT) {
             star.y = 0;
             star.x = Math.random() * GAME_WIDTH;
@@ -265,7 +265,6 @@ function drawDebris(d) {
     ctx.save();
     ctx.translate(d.x, d.y);
     ctx.rotate(d.rot);
-    // Trybik (zębate koło)
     ctx.beginPath();
     for(let i=0;i<8;i++) {
         let ang = i * Math.PI/4;
@@ -282,7 +281,6 @@ function drawDebris(d) {
     ctx.strokeStyle = "#fff";
     ctx.lineWidth = 1;
     ctx.stroke();
-    // Środek
     ctx.beginPath();
     ctx.arc(0,0,4,0,2*Math.PI);
     ctx.fillStyle="#fff";
@@ -303,21 +301,18 @@ function drawSatellite(s) {
     ctx.save();
     ctx.translate(s.x, s.y);
     ctx.rotate(Math.sin(s.y/19)*0.2);
-    // Panele słoneczne
     ctx.fillStyle = "#3af";
     ctx.fillRect(-18, -4, 8, 16);
     ctx.fillRect(10, -4, 8, 16);
     ctx.strokeStyle = "#fff";
     ctx.strokeRect(-18, -4, 8, 16);
     ctx.strokeRect(10, -4, 8, 16);
-    // Korpus
     ctx.beginPath();
     ctx.ellipse(0, 4, 10, 7, 0, 0, 2*Math.PI);
     ctx.fillStyle = "#bbb";
     ctx.fill();
     ctx.strokeStyle="#aaa";
     ctx.stroke();
-    // Antena
     ctx.beginPath();
     ctx.moveTo(0, 10);
     ctx.lineTo(0, 23);
@@ -343,7 +338,6 @@ function spawnComet() {
 function drawComet(c) {
     ctx.save();
     ctx.translate(c.x, c.y);
-    // Ogon
     let len = 36;
     for(let i=0;i<3;i++) {
         ctx.beginPath();
@@ -354,7 +348,6 @@ function drawComet(c) {
         ctx.lineWidth = 3-i;
         ctx.stroke();
     }
-    // Jądro komety
     ctx.beginPath();
     ctx.arc(0, 0, 13, 0, 2 * Math.PI);
     ctx.fillStyle = "#fff";
@@ -470,7 +463,7 @@ function drawDifficultyMenu() {
 // --- Ekrany gry ---
 function drawStartScreen() {
     ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-    updateStars();
+    updateStars(1/60);
     drawStars();
     ctx.save();
     ctx.textAlign = "center";
@@ -513,11 +506,15 @@ function drawGameOverScreen() {
     drawExplosion(rocket.x + ROCKET_WIDTH / 2, rocket.y + ROCKET_HEIGHT / 2, 70);
 }
 
-// --- Pętla gry ---
+// --- Pętla gry z delta time ---
+let lastFrameTime = performance.now();
 function gameLoop(ts) {
+    let delta = (ts - lastFrameTime) / 1000;
+    lastFrameTime = ts;
+
     ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
-    updateStars();
+    updateStars(delta);
     drawStars();
 
     if (gameState === "start") {
@@ -549,16 +546,16 @@ function gameLoop(ts) {
     spawnSatellite();
     spawnComet();
 
-    updateRocket();
+    updateRocket(delta);
     drawRocket();
 
     // --- ASTEROIDY
     asteroids.forEach(ast => {
-        if (ast.type === "spin") ast.angle += 0.12;
+        if (ast.type === "spin") ast.angle += 0.12 * delta * 60;
     });
     for (let ast of asteroids) {
-        ast.x += ast.vx;
-        ast.y += ast.vy;
+        ast.x += ast.vx * delta * 60;
+        ast.y += ast.vy * delta * 60;
     }
     asteroids = asteroids.filter(ast =>
         ast.x + ast.radius > 0 &&
@@ -601,8 +598,8 @@ function gameLoop(ts) {
 
     // --- DEBRIS (kosmiczne śmieci)
     debris.forEach((d, i) => {
-        d.y += d.vy;
-        d.rot += d.vrot;
+        d.y += d.vy * delta * 60;
+        d.rot += d.vrot * delta * 60;
         drawDebris(d);
         if (rocket.alive && rocketHitsDebris(d)) {
             if (shield.active) {
@@ -621,7 +618,7 @@ function gameLoop(ts) {
 
     // --- KOMETY & SATELITY
     comets.forEach((c, i) => {
-        c.y += c.vy;
+        c.y += c.vy * delta * 60;
         if (c.t === "comet") drawComet(c);
         else if (c.t === "sat") drawSatellite(c);
         if (rocket.alive && rocketHitsComet(c)) {
@@ -678,12 +675,13 @@ function gameLoop(ts) {
 }
 
 // --- Obsługa rakiety i restart gry ---
-function updateRocket() {
+function updateRocket(delta) {
     if (!rocket.alive) return;
-    if (keys['ArrowLeft'] || keys['a']) rocket.x -= rocket.speed;
-    if (keys['ArrowRight'] || keys['d']) rocket.x += rocket.speed;
-    if (keys['ArrowUp'] || keys['w']) rocket.y -= rocket.speed;
-    if (keys['ArrowDown'] || keys['s']) rocket.y += rocket.speed;
+    let move = rocket.speed * delta * 60;
+    if (keys['ArrowLeft'] || keys['a']) rocket.x -= move;
+    if (keys['ArrowRight'] || keys['d']) rocket.x += move;
+    if (keys['ArrowUp'] || keys['w']) rocket.y -= move;
+    if (keys['ArrowDown'] || keys['s']) rocket.y += move;
     rocket.x = Math.max(0, Math.min(GAME_WIDTH - ROCKET_WIDTH, rocket.x));
     rocket.y = Math.max(0, Math.min(GAME_HEIGHT - ROCKET_HEIGHT, rocket.y));
 }
